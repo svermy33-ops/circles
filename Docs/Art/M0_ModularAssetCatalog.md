@@ -4,9 +4,9 @@
 
 | 분류/ID | 기준 크기와 피벗 | 제안 triangle 상한 | 텍스처/재질 | M0 상태 |
 |---|---|---:|---|---|
-| Floor FL-01 | C×C, 상면 중심, 두께 아래 0.25m | 12~48 | 128², 타일 공용 | 실제 12tri 샘플 |
+| Floor FL-01 | C×C, 상면 중심, 두께 아래 0.25m | 12~48 | 64², 타일 공용 | 실제 12tri 샘플 |
 | Floor FL-02 | 손상 변형, 같은 외곽/상면 | 96 | FL-01 재사용 | 계획 |
-| Wall WL-01 | C×H×T, 바닥 중심, 정면 -Z | 12~96 | 256², 타일+콘크리트 | 기본/낡은형 실제 샘플 |
+| Wall WL-01 | C×H×T, 바닥 중심, 정면 -Z | 12~96 | 64×128, 실사 원본 축소+국소 리터칭 | 기본/낡은형 실제 샘플 |
 | Wall WL-02 | 균열·박리, WL-01과 동일 envelope | 160 | 같은 atlas | 텍스처 손상만 M0 구현 |
 | Wall Corner WC-I/O | H, 내/외 모서리 교점 바닥 피벗 | 96~192 | 벽 atlas | 계획, 이중 벽 겹침 금지 |
 | Doorway DW-01 | 실제 portal width×2.6m 개구부, 문턱 중심 | 120~240 | 벽/금속 atlas | 계획, 문 폭 임의 축소 금지 |
@@ -30,6 +30,7 @@
 
 - Mesh 3개: `SM_Wall_150x360x022.asset`, `SM_Wall_UnitCentered.asset`, `SM_Floor_150x025x150.asset`.
 - Texture 4개: `T_Wall_Basic.png`, `T_Wall_Weathered.png`, `T_Wall_Weathered_Bilinear.png`, `T_Floor.png`. Point/Bilinear의 소스 그림은 동일한 규칙으로 생성한다.
+- Texture 면 해상도는 벽 32×77px·바닥 32×32px이며 약 21.3px/m이다. 격자를 선명하게 다시 그리지 않고 기존 축소 픽셀을 조금만 수정한다. 실사풍 원본·축소본·리터칭 마스크·최종 아틀라스는 `ArtSource/Ringline/M0/`에 함께 전달한다.
 - Material 4개: 기본 벽 Point, 낡은 벽 Point/Bilinear, 바닥 Point. 모두 URP Lit.
 - Prefab 5개: 실측 벽 기본/낡은형, 실측 바닥, 현행 library용 중심 피벗 벽 기본/낡은형.
 

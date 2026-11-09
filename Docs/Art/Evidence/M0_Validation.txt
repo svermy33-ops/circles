@@ -1,6 +1,7 @@
 PASS: 5 render-only visual prefabs; identity root TRS; supported URP Lit; wall 24 vertices/12 triangles; wall bounds 1.5x3.6x0.22m; floor top y=0; 2 unit-centered adapter meshes; UV count/range; 4 texture resolution/import/filter checks; synthetic anchor collider identity/size unchanged across basic-weathered swap.
 NOT TESTED: real station anchors, NavMesh, walkability, doors, moving camera shimmer, 90-degree occlusion, FBX/GLB round trip, target hardware performance.
-Comparison order left-to-right: Basic Point / Weathered Point / Weathered Bilinear.
+Close/PlayerView: Basic Point / Weathered Point. FilterComparison: Basic Point / Weathered Point / Weathered Bilinear.
+Photographic wall surface 32x77 texels in 64x128 atlas; floor 32x32 texels in 64x64 atlas.
 No gameplay scene opened, modified or saved. Preview scenes closed after capture.
 rendering: Direct3D12 / NVIDIA GeForce RTX 3050 4GB Laptop GPU
 Unity: 6000.3.23f1

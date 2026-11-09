@@ -76,10 +76,10 @@ namespace Ringline.Art.Editor
                 MakePrefab(scene, "PF_Wall_Weathered_UnitCentered", unitWall, aged);
                 var report = Validate(basicPrefab, agedPrefab, wall, floor);
                 var comparison = NewObject(scene, "M0_Comparison");
-                RenderObject(scene, "Basic", wall, clean, new Vector3(-1.65f, 0, 0), comparison.transform);
-                RenderObject(scene, "Weathered", wall, aged, new Vector3(.3f, 0, 0), comparison.transform);
+                var basicView = RenderObject(scene, "Basic", wall, clean, new Vector3(-1.65f, 0, 0), comparison.transform);
+                var agedView = RenderObject(scene, "Weathered", wall, aged, new Vector3(.3f, 0, 0), comparison.transform);
                 var bilinear = AssetDatabase.LoadAssetAtPath<Material>(Root + "/Materials/M_Wall_Weathered_Bilinear.mat");
-                RenderObject(scene, "Weathered_Bilinear", wall, bilinear, new Vector3(2.25f, 0, 0), comparison.transform);
+                var bilinearView = RenderObject(scene, "Weathered_Bilinear", wall, bilinear, new Vector3(2.25f, 0, 0), comparison.transform);
                 for (int x = -3; x <= 3; x++)
                     for (int z = -2; z <= 2; z++)
                         RenderObject(scene, "Floor", floor, floorMat, new Vector3(x * Width, 0, z * Width), comparison.transform);
@@ -102,8 +102,13 @@ namespace Ringline.Art.Editor
                 camera.orthographic = true;
                 camera.nearClipPlane = .1f;
                 camera.farClipPlane = 100;
-                Capture(camera, "M0_Close.png", new Vector3(7, 6, -10), new Vector3(.3f, 1.2f, 0), 3.2f);
+                Capture(camera, "M0_FilterComparison.png", new Vector3(7, 6, -10), new Vector3(.3f, 1.2f, 0), 3.2f);
+                bilinearView.SetActive(false);
+                basicView.transform.localPosition = new Vector3(-.95f, 0, 0);
+                agedView.transform.localPosition = new Vector3(.95f, 0, 0);
+                Capture(camera, "M0_Close.png", new Vector3(6, 5, -8), new Vector3(0, 1.4f, 0), 3f);
                 Capture(camera, "M0_Diorama.png", new Vector3(10, 13, -14), Vector3.zero, 7f);
+                Capture(camera, "M0_PlayerView.png", new Vector3(8, 11, -12), new Vector3(0, 1, 0), 6.5f);
                 Capture(camera, "M0_Overview.png", new Vector3(.3f, 18, -.01f), new Vector3(.3f, 0, 0), 6f);
                 report += "\nrendering: " + SystemInfo.graphicsDeviceType + " / " + SystemInfo.graphicsDeviceName;
                 report += "\nUnity: " + Application.unityVersion;
@@ -129,7 +134,17 @@ namespace Ringline.Art.Editor
             mesh.name = name;
             string path = Root + "/Meshes/" + name + ".asset";
             var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-            if (existing != null) { EditorUtility.CopySerialized(mesh, existing); Object.DestroyImmediate(mesh); return existing; }
+            if (existing != null)
+            {
+                // Set mesh channels through the Mesh API so live GPU vertex buffers
+                // are invalidated as well as the serialized asset data.
+                existing.Clear();
+                existing.vertices = mesh.vertices; existing.normals = mesh.normals;
+                existing.uv = mesh.uv; existing.triangles = mesh.triangles;
+                existing.bounds = mesh.bounds;
+                EditorUtility.SetDirty(existing);
+                Object.DestroyImmediate(mesh); return existing;
+            }
             AssetDatabase.CreateAsset(mesh, path);
             return mesh;
         }
@@ -144,13 +159,13 @@ namespace Ringline.Art.Editor
             {
                 int start = vertices.Count;
                 vertices.AddRange(new[] {a, b, c, d});
-                float atlas = wall ? 256f : 128f;
-                uvs.AddRange(new[] {new Vector2(rect.xMin/atlas, rect.yMin/atlas), new Vector2(rect.xMin/atlas, rect.yMax/atlas), new Vector2(rect.xMax/atlas, rect.yMax/atlas), new Vector2(rect.xMax/atlas, rect.yMin/atlas)});
+                float atlasWidth = 64f, atlasHeight = wall ? 128f : 64f;
+                uvs.AddRange(new[] {new Vector2(rect.xMin/atlasWidth, rect.yMin/atlasHeight), new Vector2(rect.xMin/atlasWidth, rect.yMax/atlasHeight), new Vector2(rect.xMax/atlasWidth, rect.yMax/atlasHeight), new Vector2(rect.xMax/atlasWidth, rect.yMin/atlasHeight)});
                 indices.AddRange(new[] {start, start+1, start+2, start, start+2, start+3});
             }
-            Rect front = wall ? new Rect(4, 4, 96, 230) : new Rect(4, 4, 96, 16);
-            Rect edge = wall ? new Rect(108, 4, 14, 230) : front;
-            Rect cap = wall ? new Rect(132, 4, 96, 14) : new Rect(4, 4, 96, 96);
+            Rect front = wall ? new Rect(4, 4, 32, 77) : new Rect(4, 4, 32, 5);
+            Rect edge = wall ? new Rect(44, 4, 5, 77) : front;
+            Rect cap = wall ? new Rect(4, 96, 32, 5) : new Rect(4, 4, 32, 32);
             Face(new Vector3(-x,y,-z), new Vector3(-x,top,-z), new Vector3(x,top,-z), new Vector3(x,y,-z), front);
             Face(new Vector3(x,y,z), new Vector3(x,top,z), new Vector3(-x,top,z), new Vector3(-x,y,z), front);
             Face(new Vector3(-x,y,z), new Vector3(-x,top,z), new Vector3(-x,top,-z), new Vector3(-x,y,-z), edge);
@@ -165,42 +180,12 @@ namespace Ringline.Art.Editor
 
         static Texture2D MakeTexture(string name, bool weathered, bool floor, FilterMode filter = FilterMode.Point)
         {
-            int height = floor ? 128 : 256;
-            int texWidth = height;
-            var tex = new Texture2D(texWidth, height, TextureFormat.RGB24, false);
-            Color32[] pixels = new Color32[texWidth * height];
-            for (int y = 0; y < height; y++) for (int x = 0; x < texWidth; x++)
-            {
-                // Coarse deterministic patches, not high-frequency random noise.
-                int patch = ((x/5)*19 + (y/6)*31 + (x/17)*7) % 5 - 2;
-                bool grout = (x-4+128)%32 < 2 || (y-4+256)%32 < 2;
-                bool lowerBand = !floor && y < 68;
-                Color32 color = floor ? new Color32(129,136,122,255) : lowerBand ? new Color32(99,124,115,255) : new Color32(184,179,155,255);
-                if (grout) color = floor ? new Color32(90,100,89,255) : new Color32(117,126,110,255);
-                int offset = patch * 2;
-                color.r = (byte)Mathf.Clamp(color.r+offset, 0, 255);
-                color.g = (byte)Mathf.Clamp(color.g+offset, 0, 255);
-                color.b = (byte)Mathf.Clamp(color.b+offset, 0, 255);
-                int stain = (x/8*13 + y/9*17) % 19;
-                if (weathered && (y < 20 + (x/8%3)*5 || (!floor && stain < 2 && y < 135)))
-                    color = stain < 8 ? new Color32(76,99,66,255) : new Color32(111,104,74,255);
-                if (weathered && x > 45 && x < 50 + y/35 && y > 65 && y < 146)
-                    color = new Color32(111,115,99,255);
-                pixels[y*texWidth+x] = color;
-            }
-            // Extend each island's edge into an explicit 4px gutter before mip generation.
-            var source = (Color32[])pixels.Clone();
-            void Pad(int x0,int y0,int w,int h)
-            {
-                for(int yy=Math.Max(0,y0-4); yy<Math.Min(height,y0+h+4); yy++)
-                    for(int xx=Math.Max(0,x0-4); xx<Math.Min(texWidth,x0+w+4); xx++)
-                        pixels[yy*texWidth+xx] = source[Mathf.Clamp(yy,y0,y0+h-1)*texWidth+Mathf.Clamp(xx,x0,x0+w-1)];
-            }
-            if(floor) Pad(4,4,96,96);
-            else { Pad(4,4,96,230); Pad(108,4,14,230); Pad(132,4,96,14); }
-            tex.SetPixels32(pixels); tex.Apply();
+            // Approved photographic source -> actual low-res reduction -> masked
+            // retouch -> atlas. Never overwrite this with a procedural pixel pattern.
+            string sourcePath = "ArtSource/Ringline/M0/FinalAtlases/" + name + ".png";
+            if (!File.Exists(sourcePath)) throw new FileNotFoundException("Run M0PhotoTexturePipeline Prepare and Complete first.", sourcePath);
             string path = Root + "/Textures/" + name + ".png";
-            File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex);
+            File.Copy(sourcePath, path, true);
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
             importer.textureType = TextureImporterType.Default;
@@ -211,7 +196,7 @@ namespace Ringline.Art.Editor
             importer.mipmapEnabled = true;
             importer.mipMapBias = 0;
             importer.anisoLevel = 1;
-            importer.maxTextureSize = 256;
+            importer.maxTextureSize = 128;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.isReadable = false;
             importer.alphaSource = TextureImporterAlphaSource.None;
@@ -276,8 +261,8 @@ namespace Ringline.Art.Editor
                 string path=Root+"/Textures/"+name+".png";
                 var importer=(TextureImporter)AssetImporter.GetAtPath(path);
                 var texture=AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-                int expectedSize=name=="T_Floor" ? 128 : 256;
-                Check(texture.width==expectedSize && texture.height==expectedSize, "texture resolution");
+                int expectedHeight=name=="T_Floor" ? 64 : 128;
+                Check(texture.width==64 && texture.height==expectedHeight, "texture resolution");
                 Check(importer.mipmapEnabled && importer.sRGBTexture && !importer.isReadable && importer.wrapMode==TextureWrapMode.Clamp && importer.textureCompression==TextureImporterCompression.Uncompressed, "texture import settings");
                 Check(importer.filterMode==(name.EndsWith("Bilinear") ? FilterMode.Bilinear : FilterMode.Point), "texture filter");
             }
@@ -309,7 +294,7 @@ namespace Ringline.Art.Editor
                 Check(bounds.size==Vector3.one && bounds.center.sqrMagnitude<1e-8f, "unit-centered adapter bounds");
                 Check(prefab.transform.localScale==Vector3.one, "adapter scale");
             }
-            return "PASS: 5 render-only visual prefabs; identity root TRS; supported URP Lit; wall 24 vertices/12 triangles; wall bounds 1.5x3.6x0.22m; floor top y=0; 2 unit-centered adapter meshes; UV count/range; 4 texture resolution/import/filter checks; synthetic anchor collider identity/size unchanged across basic-weathered swap.\nNOT TESTED: real station anchors, NavMesh, walkability, doors, moving camera shimmer, 90-degree occlusion, FBX/GLB round trip, target hardware performance.\nComparison order left-to-right: Basic Point / Weathered Point / Weathered Bilinear.\nNo gameplay scene opened, modified or saved. Preview scenes closed after capture.";
+            return "PASS: 5 render-only visual prefabs; identity root TRS; supported URP Lit; wall 24 vertices/12 triangles; wall bounds 1.5x3.6x0.22m; floor top y=0; 2 unit-centered adapter meshes; UV count/range; 4 texture resolution/import/filter checks; synthetic anchor collider identity/size unchanged across basic-weathered swap.\nNOT TESTED: real station anchors, NavMesh, walkability, doors, moving camera shimmer, 90-degree occlusion, FBX/GLB round trip, target hardware performance.\nClose/PlayerView: Basic Point / Weathered Point. FilterComparison: Basic Point / Weathered Point / Weathered Bilinear.\nPhotographic wall surface 32x77 texels in 64x128 atlas; floor 32x32 texels in 64x64 atlas.\nNo gameplay scene opened, modified or saved. Preview scenes closed after capture.";
         }
 
         static void Capture(Camera camera, string name, Vector3 position, Vector3 target, float size)

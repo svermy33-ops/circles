@@ -61,18 +61,20 @@ Blender 제작 시 Metric, Unit Scale 1.0, 실제 치수로 모델링하고 Rota
 
 | 항목 | M0 구현 및 M1 방향 |
 |---|---|
-| 환경 기준 밀도 | 약 64 px/m 제안. 열차 근접 조작부는 128 px/m 후보, 아직 미제작 |
-| 벽 atlas | 256×256 RGB PNG. 앞/뒤 96×230px, 끝면 14×230px, 상하 96×14px |
-| UV island 좌표 | 앞/뒤 (4,4)-(100,234), 끝면 (108,4)-(122,234), 상하 (132,4)-(228,18), 왼쪽 아래 원점 |
-| 바닥 atlas | 128×128 RGB PNG, 상면 96×96px. 1.5m당 96px |
-| 밀도 오차 | 벽 높이 230/3.6=63.89px/m, 두께 14/.22=63.64px/m. 정수 픽셀 반올림 |
+| 환경 기준 밀도 | 사용자 최종 지시로 약 21.3 px/m. 플레이 거리에서 도트를 확인하되, 격자는 부드럽게 유지 |
+| 벽 atlas | 64×128 RGB PNG. 앞/뒤 32×77px, 끝면 5×77px, 상하 32×5px |
+| UV island 좌표 | 앞/뒤 (4,4)-(36,81), 끝면 (44,4)-(49,81), 상하 (4,96)-(36,101), 왼쪽 아래 원점 |
+| 바닥 atlas | 64×64 RGB PNG, 상면 32×32px. 1.5m당 32px |
+| 밀도 오차 | 벽 높이 77/3.6=21.39px/m, 두께 5/.22=22.73px/m. 정수 픽셀 반올림 |
 | padding | island 경계 4px edge dilation. 낮은 mip에서 섞임을 막는 보장은 아님; 거리 검사 필요 |
 | overlap | 동일 재질의 앞/뒤, 양 끝, 상/하 UV0를 의도적으로 공유. UV1에는 공유 금지 |
 | 기본 필터 | Point + Mipmap On + bias 0 + aniso 1. Bilinear 비교 텍스처 별도 제공 |
-| Import | Default, sRGB On, Clamp, NPOT None, alpha 없음, Read/Write Off, Uncompressed, max 256 |
+| Import | Default, sRGB On, Clamp, NPOT None, alpha 없음, Read/Write Off, Uncompressed, max 128 |
 | Map | Base Color만. Metallic=0, Smoothness=.05, normal/metallic/AO 텍스처 없음 |
 
-Mip Off는 이동 중 shimmer 비교용 후속 후보이며 아직 테스트하지 않았다. 샘플의 반복 패턴·atlas padding은 대형 맵에서 추가 개선이 필요하다. 전체 atlas에 어두운 AO와 방향성 그림자를 강하게 구워 넣지 않는다.
+제작 순서는 **실사풍 원본 → area box 축소 → 필요한 texel만 국소 리터칭 → 아틀라스**로 고정한다. 현재 실사풍 원본은 built-in ImageGen 생성 이미지다. 원본·축소본·마스크·최종본과 프롬프트는 `ArtSource/Ringline/M0/`에 보관한다. 기본 벽은 축소본을 그대로 사용하고, 낡은 벽은 10texel(0.406%), 바닥은 4texel(0.391%)만 리터칭했다. 마스크 밖 변경은 0, 채널 변화는 최대 6/255다. 흐린 줄눈 전체를 다시 그리거나 대비를 올리지 않는다. 기존 저해상도 픽셀의 색에 맞춰 조금만 수정한다. 코드로 그리는 반복 픽셀 무늬는 재생성 경로에서 제거했다.
+
+Mip Off는 이동 중 shimmer 비교용 후속 후보이며 아직 테스트하지 않았다. 샘플의 반복 연결·atlas padding은 대형 맵에서 추가 개선이 필요하다. 전체 atlas에 어두운 AO와 방향성 그림자를 강하게 구워 넣지 않는다.
 
 ## Material·Shader
 

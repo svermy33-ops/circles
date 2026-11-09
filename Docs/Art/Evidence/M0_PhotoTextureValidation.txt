@@ -1,0 +1,4 @@
+Photorealistic generated source -> area-box downsample -> local retouch -> UV atlas.
+Wall_Basic: 32x77; changed=0/2464 (0.000%); changedOutsideMask=0; maximumChannelDelta=0/255.
+Wall_Weathered: 32x77; changed=10/2464 (0.406%); changedOutsideMask=0; maximumChannelDelta=6/255.
+Floor: 32x32; changed=4/1024 (0.391%); changedOutsideMask=0; maximumChannelDelta=6/255.
